@@ -1497,13 +1497,9 @@ class MealGenerator {
   }
 
   // 选择豆制品或豆类
-  // 豆腐和全豆轮流出现，用 usageMap 确保轮换（优先选使用次数少的类型）
+  // 豆腐和全豆轮流出现，用 rng 随机决定类型，全豆不受纤维限制
   pickBeanOrLegume(rng, month, usageMap, usedIngredients, maxFiber = 'high') {
-    // 统计豆腐和全豆最近使用次数，优先选使用少的类型
-    const tofuCount = usageMap['豆腐'] || 0;
-    const legumeCount = ['黑豆','黄豆','鹰嘴豆','毛豆'].reduce((sum, name) => sum + (usageMap[name] || 0), 0);
-    const preferTofu = legumeCount >= tofuCount; // 全豆用得多则选豆腐，反之亦然
-    
+    const preferTofu = rng.bool(0.5);
     const groups = preferTofu
       ? [FOOD_DATA.beans, FOOD_DATA.legumes]
       : [FOOD_DATA.legumes, FOOD_DATA.beans];
