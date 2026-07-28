@@ -207,6 +207,11 @@
       scrollbar-width: none;
     }
     .aqi-bar::-webkit-scrollbar { display: none; }
+    .aqi-bar.three-cards .aqi-card,
+    .aqi-bar.two-cards .aqi-card {
+      flex: 1 1 0;
+      min-width: 0;
+    }
     .aqi-loading { color: var(--ios-text-secondary); font-size: 13px; padding: 8px 0; }
     .aqi-card {
       flex-shrink: 0;
@@ -3381,7 +3386,7 @@ const aqiModule = {
   async init() {
     this.fetch();
     if (this._timer) clearInterval(this._timer);
-    this._timer = setInterval(() => this.fetch(), 5 * 60 * 1000);
+    this._timer = setInterval(() => this.fetch(), 2 * 60 * 1000); // 每2分钟刷新
   },
 
   async fetch() {
@@ -3389,12 +3394,12 @@ const aqiModule = {
     if (!bar) return;
 
     const now = Date.now();
-    if (this._cache && now - this._cacheTime < 60000) {
+    if (this._cache && now - this._cacheTime < 90000) {
       this.render(this._cache);
       return;
     }
 
-    bar.innerHTML = this.getBabyAgeCardHtml() + (typeof goldModule !== 'undefined' ? goldModule.getGoldCardHtml() : '');
+    this._renderBar(this.getBabyAgeCardHtml() + (typeof goldModule !== 'undefined' ? goldModule.getGoldCardHtml() : ''));
 
     const results = [];
 
@@ -3484,8 +3489,21 @@ const aqiModule = {
       this._cacheTime = now;
       this.render(results);
     } else {
-      bar.innerHTML = this.getBabyAgeCardHtml() + (typeof goldModule !== 'undefined' ? goldModule.getGoldCardHtml() : '');
+      this._renderBar(this.getBabyAgeCardHtml() + (typeof goldModule !== 'undefined' ? goldModule.getGoldCardHtml() : ''));
     }
+  },
+
+  // 统一设置 aqi-bar 内容并自动计算卡片数量 class
+  _renderBar(html) {
+    const bar = $('aqi-bar');
+    if (!bar) return;
+    bar.innerHTML = html;
+    // 统计可见卡片数量（aqi-card 元素）
+    const count = bar.querySelectorAll('.aqi-card').length;
+    bar.classList.remove('two-cards', 'three-cards', 'four-cards');
+    if (count === 2) bar.classList.add('two-cards');
+    else if (count === 3) bar.classList.add('three-cards');
+    else if (count >= 4) bar.classList.add('four-cards');
   },
 
   // 计算宝宝月龄（生日 2024.2.28）
@@ -3536,11 +3554,13 @@ const aqiModule = {
     if (typeof goldModule !== 'undefined') {
       html += goldModule.getGoldCardHtml();
     }
+    let aqiCardCount = 0;
     for (const r of results) {
       // IQAir 未配置的不显示
       if (typeof r.aqi !== 'number') continue;
-      // 仅 AQI > 70 时才显示 AQI 卡片
-      if (r.aqi <= 70) continue;
+      // 仅 AQI > 80 时才显示 AQI 卡片
+      if (r.aqi <= 80) continue;
+      aqiCardCount++;
       const aqiText = r.aqi;
       html += `<div class="aqi-card" style="background:${r.level.bg};">
         <div class="aqi-card-source">${escapeHtml(r.source)}</div>
@@ -3553,7 +3573,7 @@ const aqiModule = {
         ${r.time ? `<div class="aqi-card-time">${escapeHtml(r.time)}</div>` : ''}
       </div>`;
     }
-    bar.innerHTML = html;
+    this._renderBar(html);
   }
 };
 
@@ -4503,15 +4523,15 @@ const goldModule = {
   async init() {
     this.fetchGold();
     if (this._timer) clearInterval(this._timer);
-    this._timer = setInterval(() => this.fetchGold(), 30 * 1000); // 每30秒刷新收益
+    this._timer = setInterval(() => this.fetchGold(), 15 * 1000); // 每15秒刷新金价
   },
 
   async fetchGold() {
-    const bar = $('gold-bar');
-    if (!bar && !app) return;
+    const bar = $('aqi-bar');
+    if (!bar) return;
 
     const now = Date.now();
-    if (this._cache && now - this._cacheTime < 15000) {
+    if (this._cache && now - this._cacheTime < 10000) {
       this.renderBar(this._cache);
       return;
     }
@@ -4595,8 +4615,19 @@ const goldModule = {
       }
     } else if (goldHtml) {
       // 没有金价卡片但有金价数据，插入到月龄卡片之后
-      bar.insertAdjacentHTML('afterbegin', goldHtml);
+      const babyCard = bar.querySelector('.aqi-card');
+      if (babyCard) {
+        babyCard.insertAdjacentHTML('afterend', goldHtml);
+      } else {
+        bar.insertAdjacentHTML('afterbegin', goldHtml);
+      }
     }
+    // 更新卡片数量 class
+    const count = bar.querySelectorAll('.aqi-card').length;
+    bar.classList.remove('two-cards', 'three-cards', 'four-cards');
+    if (count === 2) bar.classList.add('two-cards');
+    else if (count === 3) bar.classList.add('three-cards');
+    else if (count >= 4) bar.classList.add('four-cards');
   },
 
   // ===== 持仓管理 =====
