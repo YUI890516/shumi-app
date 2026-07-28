@@ -1888,15 +1888,7 @@ class MealGenerator {
         }
       }
 
-      // 最后剥离豆制品的搭配配菜（保留豆制品本身）
-      if (action < 0) {
-        for (let i = dishes.length - 1; i >= 0; i--) {
-          if (dishes[i].category === 'bean' && dishes[i].ingredients.length > 1) {
-            action = 2; targetIdx = i; break;
-          }
-        }
-      }
-
+      // 豆制品和全豆的搭配配菜不剥离（和蛋白质一样受保护）
       if (action < 0) break;
 
       if (action === 0) {
@@ -1904,20 +1896,15 @@ class MealGenerator {
         const removed = dishes.splice(targetIdx, 1)[0];
         const idx = mealItems.findIndex(m => m.name === removed.ingredients[0]);
         if (idx >= 0) mealItems.splice(idx, 1);
-      } else {
-        // 剥离搭配配菜，只保留主食材
+      } else if (action === 1) {
+        // 剥离绿叶菜的蘑菇搭配，只保留绿叶菜本身
         const dish = dishes[targetIdx];
-        const mainIng = dish.ingredients[0];
-        const removedIng = dish.ingredients.slice(1);
-        dish.ingredients = [mainIng];
+        const mushroomTypes = ['香菇','白蘑菇','蘑菇','平菇','蟹味菇','牛肝菌','鸡纵菌'];
+        const removedIng = dish.ingredients.filter(ing => mushroomTypes.includes(ing));
+        dish.ingredients = dish.ingredients.filter(ing => !mushroomTypes.includes(ing));
         // 重建菜名
-        if (dish.category === 'bean') {
-          const m = this.getCookMethod(rng);
-          dish.name = dish.name.includes('炖汤') ? `${mainIng}炖汤` : `${m.prefix}${mainIng}`;
-        } else {
-          const m = this.getCookMethod(rng);
-          dish.name = `${m.prefix}${mainIng}`;
-        }
+        const m = this.getCookMethod(rng);
+        dish.name = `${m.prefix}${dish.ingredients[0]}`;
         for (const ing of removedIng) {
           const idx = mealItems.findIndex(m => m.name === ing);
           if (idx >= 0) mealItems.splice(idx, 1);
