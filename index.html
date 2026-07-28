@@ -2823,8 +2823,7 @@ const babyfoodModule = {
       if (dish.name.includes('炖汤')) {
         dish.name = dish.ingredients.join('') + '炖汤';
       } else {
-        const prefix = dish.name.startsWith('清蒸') ? '清蒸' : dish.name.startsWith('水煮') ? '水煮' : dish.name.startsWith('凉拌') ? '凉拌' : '';
-        dish.name = prefix + dish.ingredients.join('');
+        dish.name = dish.ingredients.join('');
       }
     } else {
       // 只剩1个食材，删除整道菜，用 null 占位保持栏位对齐
@@ -3030,19 +3029,16 @@ const babyfoodModule = {
         if (!existingDish.ingredients) existingDish.ingredients = [existingDish.name];
         if (!existingDish.ingredients.includes(ingredientName)) {
           existingDish.ingredients.push(ingredientName);
-          // 更新菜名
+          // 更新菜名：直接用食材名拼接，不加烹饪前缀
           if (existingDish.name.includes('炖汤')) {
             existingDish.name = existingDish.ingredients.join('') + '炖汤';
           } else {
-            const prefix = existingDish.name.startsWith('清蒸') ? '清蒸' : existingDish.name.startsWith('水煮') ? '水煮' : existingDish.name.startsWith('凉拌') ? '凉拌' : '';
-            existingDish.name = prefix + existingDish.ingredients.join('');
+            existingDish.name = existingDish.ingredients.join('');
           }
         }
       } else {
         // 当前栏位没有菜品：新建菜品放到 slot 位置（用 null 占位保持对齐）
-        const cookMethods = ['清蒸', '水煮', '凉拌'];
-        const m = cookMethods[Math.floor(Math.random() * cookMethods.length)];
-        const dishName = cat === 'bean' ? ingredientName + '炖汤' : m + ingredientName;
+        const dishName = cat === 'bean' ? ingredientName + '炖汤' : ingredientName;
         while (dishes.length < slot) dishes.push(null);
         dishes[slot] = { name: dishName, category: cat, ingredients: [ingredientName], note: '手动选择' };
       }
