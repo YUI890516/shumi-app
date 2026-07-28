@@ -2811,12 +2811,13 @@ const babyfoodModule = {
       if (dish.name.includes('炖汤')) {
         dish.name = dish.ingredients.join('') + '炖汤';
       } else {
-        const prefix = dish.name.startsWith('清蒸') ? '清蒸' : dish.name.startsWith('水煮') ? '水煮' : '';
+        const prefix = dish.name.startsWith('清蒸') ? '清蒸' : dish.name.startsWith('水煮') ? '水煮' : dish.name.startsWith('凉拌') ? '凉拌' : '';
         dish.name = prefix + dish.ingredients.join('');
       }
     } else {
       task.content.dishes.splice(dishIndex, 1);
     }
+    task.content.dishes = task.content.dishes.filter(d => d !== null);
     task.content.manuallyEdited = true;
     task.content.nutritionSummary = this._calcNutrition(task.content.dishes);
     task.updatedAt = new Date().toISOString();
@@ -3007,7 +3008,7 @@ const babyfoodModule = {
         dishes.unshift({ name: stapleName, category: 'staple', ingredients: stapleIng, note: '' });
       }
     } else {
-      // 其他栏位：新建菜品或添加到已有菜品
+      // slot 1/2/3 对应 dishes[slot]
       // 检查相克
       for (const d of dishes) {
         const incompatible = FOOD_DATA.incompatible[ingredientName] || [];
@@ -3016,15 +3017,39 @@ const babyfoodModule = {
           break;
         }
       }
-      const cookMethods = ['清蒸', '水煮', '凉拌'];
-      const m = cookMethods[Math.floor(Math.random() * cookMethods.length)];
-      const dishName = cat === 'bean' ? ingredientName + '炖汤' : m + ingredientName;
-      dishes.push({ name: dishName, category: cat, ingredients: [ingredientName], note: '手动选择' });
+      const existingDish = dishes[slot];
+      if (existingDish) {
+        // 当前栏位已有菜品：把食材加到这个菜品
+        if (!existingDish.ingredients) existingDish.ingredients = [existingDish.name];
+        if (!existingDish.ingredients.includes(ingredientName)) {
+          existingDish.ingredients.push(ingredientName);
+          // 更新菜名
+          if (existingDish.name.includes('炖汤')) {
+            existingDish.name = existingDish.ingredients.join('') + '炖汤';
+          } else {
+            const prefix = existingDish.name.startsWith('清蒸') ? '清蒸' : existingDish.name.startsWith('水煮') ? '水煮' : existingDish.name.startsWith('凉拌') ? '凉拌' : '';
+            existingDish.name = prefix + existingDish.ingredients.join('');
+          }
+        }
+      } else {
+        // 当前栏位没有菜品：新建菜品放到 slot 位置
+        const cookMethods = ['清蒸', '水煮', '凉拌'];
+        const m = cookMethods[Math.floor(Math.random() * cookMethods.length)];
+        const dishName = cat === 'bean' ? ingredientName + '炖汤' : m + ingredientName;
+        const newDish = { name: dishName, category: cat, ingredients: [ingredientName], note: '手动选择' };
+        // 确保 dishes 数组长度足够
+        while (dishes.length < slot) dishes.push(null);
+        dishes[slot] = newDish;
+        // 清除 null 占位
+        for (let i = dishes.length - 1; i >= 0; i--) {
+          if (dishes[i] === null) dishes.splice(i, 1);
+        }
+      }
     }
 
-    task.content.dishes = dishes;
+    task.content.dishes = dishes.filter(d => d !== null);
     task.content.manuallyEdited = true;
-    task.content.nutritionSummary = this._calcNutrition(dishes);
+    task.content.nutritionSummary = this._calcNutrition(task.content.dishes);
     task.updatedAt = new Date().toISOString();
     await storage.put('tasks', task);
     showToast('已添加：' + ingredientName);
