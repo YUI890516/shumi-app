@@ -822,9 +822,7 @@ const FOOD_DATA = {
   ],
   // 豆制品：计入豆类摄入
   beans: [
-    {name:"豆腐", sub:"tofu", fiber:'low', season:[], flavor:'mild', common:true, cookStyle:['炖汤','清蒸'], legume:true},
-    {name:"豆腐干", sub:"dried_tofu", fiber:'mid', season:[], flavor:'mild', cookStyle:['清蒸','水煮'], legume:true},
-    {name:"腐竹", sub:"tofu_skin", fiber:'mid', season:[], flavor:'mild', cookStyle:['炖汤'], legume:true}
+    {name:"豆腐", sub:"tofu", fiber:'low', season:[], flavor:'mild', common:true, cookStyle:['炖汤','清蒸'], legume:true}
   ],
   // 全豆/干豆：可作为配菜或单独豆类菜品
   legumes: [
@@ -835,10 +833,8 @@ const FOOD_DATA = {
   ],
   // 食材相克表：不能同餐出现的组合
   incompatible: {
-    "菠菜":["豆腐","豆腐干","腐竹"],
+    "菠菜":["豆腐"],
     "豆腐":["菠菜"],
-    "豆腐干":["菠菜"],
-    "腐竹":["菠菜"],
     "黄瓜":["花生","番茄"],
     "番茄":["黄瓜","土豆"],
     "土豆":["番茄"],
@@ -1616,8 +1612,9 @@ class MealGenerator {
   }
 
   // 选择额外配菜（单独成菜，优先甜味根茎瓜果）
+  // 山药只做搭配配菜，不单独成菜
   pickExtraSide(rng, month, usageMap, usedIngredients, maxFiber, avoidStarchy) {
-    let pool = FOOD_DATA.sides.filter(s => !this.seasoningSides().includes(s.name) && s.sub !== 'mushroom' && !usedIngredients.includes(s.name));
+    let pool = FOOD_DATA.sides.filter(s => !this.seasoningSides().includes(s.name) && s.sub !== 'mushroom' && s.name !== '山药' && !usedIngredients.includes(s.name));
     if (maxFiber === 'low') pool = pool.filter(s => s.fiber === 'low');
     if (maxFiber === 'mid') pool = pool.filter(s => s.fiber !== 'high');
     if (avoidStarchy) pool = pool.filter(s => !s.starchy);
