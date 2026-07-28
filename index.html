@@ -1926,6 +1926,24 @@ class MealGenerator {
       }
     }
 
+    // 7.5 如果移除了豆制品菜导致食材不足5种，补充一个单独配菜
+    while (this.countIngredients(dishes) < 5) {
+      const extraExclude = [...starchyExclude, ...pumpkinCarrotExclude()];
+      let extra = this.pickExtraSide(rng, month, usageMap, usedAll().concat(extraExclude), maxFiber, avoidStarchy);
+      if (!extra) extra = this.pickExtraSide(rng, month, usageMap, usedAll().concat(extraExclude), 'high', false);
+      if (!extra) break;
+      const method = this.getCookMethod(rng);
+      dishes.push({
+        name: this.makeDishName(extra, method, 'side'),
+        category: 'vegetable',
+        ingredients: [extra.name],
+        note: `${method.note}，易消化`,
+        fiber: extra.fiber
+      });
+      mealItems.push(extra);
+      if (extra.starchy) starchyExclude.push(...allStarchySideNames);
+    }
+
     const hasLegumeIngredient = dishes.some(d => (d.ingredients || []).some(i => {
       const all = [...FOOD_DATA.sides, ...FOOD_DATA.legumes, ...FOOD_DATA.beans, ...FOOD_DATA.staples];
       const it = all.find(x => x.name === i);
