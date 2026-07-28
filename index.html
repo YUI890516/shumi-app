@@ -2674,25 +2674,33 @@ const babyfoodModule = {
 
     let html = '';
     // 确保今天有午餐和晚餐任务（空白餐卡，用户手动选择）
+    // 旧版本自动生成的食谱没有 blank 标记，需要替换为空白餐卡
     const ensureMealTasks = async () => {
       const types = ['lunch', 'dinner'];
       for (const type of types) {
-        const exists = todayTasks.find(t => t.type === type);
-        if (!exists) {
-          const task = {
-            id: uuid(), date: today, module: 'babyfood', type,
-            title: type === 'lunch' ? '午餐' : '晚餐',
-            content: {
-              mealType: type,
-              dishes: [],
-              nutritionSummary: { protein: false, vegetables: false, staple: false, fish: false, beans: false }
-            },
-            manuallyEdited: true,
-            completed: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-          };
-          await storage.put('tasks', task);
-          todayTasks.push(task);
+        const existing = todayTasks.find(t => t.type === type);
+        if (existing && existing.blank) continue; // 已是空白餐卡
+        // 删除旧任务（自动生成的或旧格式）
+        if (existing) {
+          await storage.delete('tasks', existing.id);
+          const idx = todayTasks.indexOf(existing);
+          if (idx >= 0) todayTasks.splice(idx, 1);
         }
+        // 创建空白餐卡
+        const task = {
+          id: uuid(), date: today, module: 'babyfood', type,
+          title: type === 'lunch' ? '午餐' : '晚餐',
+          content: {
+            mealType: type,
+            dishes: [],
+            nutritionSummary: { protein: false, vegetables: false, staple: false, fish: false, beans: false }
+          },
+          blank: true,
+          manuallyEdited: true,
+          completed: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+        };
+        await storage.put('tasks', task);
+        todayTasks.push(task);
       }
     };
     await ensureMealTasks();
@@ -3074,6 +3082,7 @@ const babyfoodModule = {
           nutritionSummary: { protein: false, vegetables: false, staple: false, fish: false, beans: false }
         },
         manuallyEdited: true,
+        blank: true,
         completed: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
     }
