@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'workbench-v61';
+const CACHE_VERSION = 'workbench-v62';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
