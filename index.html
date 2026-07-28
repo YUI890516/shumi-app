@@ -742,6 +742,7 @@ const FOOD_DATA = {
     {name:"小馄饨", sub:"wonton", fiber:'low', flavor:'mild', season:[], common:true, ingredients:["小馄饨"]},
     {name:"面条", sub:"noodle", fiber:'low', flavor:'mild', season:[], common:true, ingredients:["面条"]},
     {name:"小米", sub:"millet", fiber:'low', flavor:'mild', season:[], common:true, ingredients:["小米"]},
+    {name:"燕麦", sub:"oat", fiber:'low', flavor:'mild', season:[], common:true, ingredients:["燕麦"]},
     {name:"面疙瘩", sub:"dough_drop", fiber:'low', flavor:'mild', season:[], ingredients:["面疙瘩"]},
     {name:"意大利面", sub:"pasta", fiber:'low', flavor:'mild', season:[], ingredients:["意大利面"]}
   ],
@@ -2785,7 +2786,7 @@ const babyfoodModule = {
           <div class="dish-info" style="flex:1;">
             <div style="display:flex;align-items:center;gap:6px;">
               <span style="font-size:10px;color:var(--ios-text-secondary);">${slotLabels[s]}</span>
-              ${s > 0 ? `<span style="font-size:11px;color:var(--ios-primary);cursor:pointer;" onclick="babyfoodModule.showFoodPicker('${t.id}', ${s})">＋</span>` : ''}
+              ${s > 0 ? `<span style="font-size:18px;color:var(--ios-primary);cursor:pointer;font-weight:700;padding:2px 6px;" onclick="babyfoodModule.showFoodPicker('${t.id}', ${s})">＋</span>` : ''}
             </div>
             <div class="dish-name">${escapeHtml(dish.name)}</div>
             <div style="margin-top:2px;">${ingTags}</div>
