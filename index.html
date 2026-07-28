@@ -2680,10 +2680,11 @@ const babyfoodModule = {
     // 确保今天有午餐和晚餐任务（空白餐卡，用户手动选择）
     // 旧版本自动生成的食谱没有 blank 标记，需要替换为空白餐卡
     const ensureMealTasks = async () => {
+      const BLANK_VER = 2; // 空白餐卡版本号，修改此数字可强制清空旧数据
       const types = ['lunch', 'dinner'];
       for (const type of types) {
         const existing = todayTasks.find(t => t.type === type);
-        if (existing && existing.blank) continue; // 已是空白餐卡
+        if (existing && existing.blank && existing.blankVer === BLANK_VER) continue;
         // 删除旧任务（自动生成的或旧格式）
         if (existing) {
           await storage.delete('tasks', existing.id);
@@ -2700,6 +2701,7 @@ const babyfoodModule = {
             nutritionSummary: { protein: false, vegetables: false, staple: false, fish: false, beans: false }
           },
           blank: true,
+          blankVer: BLANK_VER,
           manuallyEdited: true,
           completed: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
         };
@@ -3073,6 +3075,7 @@ const babyfoodModule = {
         },
         manuallyEdited: true,
         blank: true,
+        blankVer: 2,
         completed: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
     }
