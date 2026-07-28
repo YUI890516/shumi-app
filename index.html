@@ -1740,7 +1740,15 @@ class MealGenerator {
       const method = this.getCookMethod(rng);
       // 蛋白质搭配一种合适的配菜（排除当天已用的淀粉配菜和南瓜/胡萝卜冲突）
       const partnerExclude = [...starchyExclude, ...pumpkinCarrotExclude()];
-      let partner = this.pickProteinPartner(rng, month, usageMap, usedAll().concat(partnerExclude), maxFiber, avoidStarchy);
+      // 豆类杂粮主食时优先选山药作为蛋白质搭配
+      let partner = null;
+      if (needYamshan) {
+        const yamshan = FOOD_DATA.sides.find(s => s.name === '山药' && !usedAll().includes('山药') && !partnerExclude.includes('山药'));
+        if (yamshan) partner = yamshan;
+      }
+      if (!partner) {
+        partner = this.pickProteinPartner(rng, month, usageMap, usedAll().concat(partnerExclude), maxFiber, avoidStarchy);
+      }
       // 如果严格条件下找不到搭配，逐步放宽限制（肉类必须搭配其他食材）
       if (!partner) {
         partner = this.pickProteinPartner(rng, month, usageMap, usedAll().concat(partnerExclude), maxFiber, false);
@@ -1765,21 +1773,15 @@ class MealGenerator {
       if (partner && partner.starchy) starchyExclude.push(...allStarchySideNames);
     }
 
-    // 3.5 豆类杂粮主食必须搭配山药（优先让蛋白质配菜选山药，否则单独添加）
+    // 3.5 豆类杂粮主食需要山药搭配：优先让蛋白质配菜选山药
+    // 如果蛋白质已选了其他配菜，则让豆制品配菜选山药；都不行则不强制添加（山药不单独成菜）
     if (needYamshan && !this.usedNames(dishes).includes('山药')) {
-      const yamshan = FOOD_DATA.sides.find(s => s.name === '山药' && !usedAll().includes('山药'));
-      if (yamshan) {
-        const method = this.getCookMethod(rng);
-        dishes.push({
-          name: this.makeDishName(yamshan, method, 'side'),
-          category: 'vegetable',
-          ingredients: ['山药'],
-          note: '搭配豆类杂粮主食，健脾养胃',
-          fiber: yamshan.fiber
-        });
-        mealItems.push(yamshan);
-        if (yamshan.starchy) starchyExclude.push(...allStarchySideNames);
+      // 尝试把山药加入蛋白质菜品的配菜中
+      const proteinDish = dishes.find(d => (d.category === 'protein' || d.category === 'fish') && d.ingredients.length >= 2);
+      if (proteinDish && !proteinDish.ingredients.includes('山药')) {
+        // 蛋白质已有配菜，不替换（保留原配菜）
       }
+      // 山药不单独成菜，只作为搭配；如果没被选中就跳过
     }
 
     // 4. 豆制品/豆类（每天最多一种豆制品，优先午餐）
@@ -1795,7 +1797,15 @@ class MealGenerator {
         const isBean = FOOD_DATA.beans.some(b => b.name === bean.name);
         const beanExclude = [...starchyExclude, ...pumpkinCarrotExclude()];
         // 豆制品和全豆都必须有搭配食材，不单独成菜
-        let beanPartner = this.pickBeanPartner(rng, month, usageMap, usedAll().concat(beanExclude), mealMaxFiber);
+        // 豆类杂粮主食时优先选山药作为豆制品搭配
+        let beanPartner = null;
+        if (needYamshan && !this.usedNames(dishes).includes('山药')) {
+          const yamshan = FOOD_DATA.sides.find(s => s.name === '山药' && !usedAll().includes('山药') && !beanExclude.includes('山药'));
+          if (yamshan) beanPartner = yamshan;
+        }
+        if (!beanPartner) {
+          beanPartner = this.pickBeanPartner(rng, month, usageMap, usedAll().concat(beanExclude), mealMaxFiber);
+        }
         // 放宽限制重试
         if (!beanPartner) {
           beanPartner = this.pickBeanPartner(rng, month, usageMap, usedAll().concat(beanExclude), 'high');
