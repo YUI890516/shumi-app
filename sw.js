@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'workbench-v76';
+const CACHE_VERSION = 'workbench-v77';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -23,8 +23,19 @@ self.addEventListener('activate', e => {
       return Promise.all(names.map(name => {
         if (name !== CACHE_VERSION) return caches.delete(name);
       }));
-    }).then(() => self.clients.claim())
+    }).then(() => self.clients.claim()).then(() => {
+      // 通知所有客户端 SW 已更新
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION }));
+      });
+    })
   );
+});
+
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', e => {

@@ -2004,11 +2004,27 @@ const mealGenerator = new MealGenerator();
 
 /* ================= 应用主控 ================= */
 
+const APP_VERSION = 'v77'; // 必须与 sw.js 的 CACHE_VERSION 数字一致
 const app = {
   currentModule: 'english',
   autoSaveTimer: null,
 
   async init() {
+    // 版本检查：如果 APP_VERSION 变化，强制清旧 SW 并刷新
+    const lastVer = localStorage.getItem('app_version');
+    if (lastVer && lastVer !== APP_VERSION) {
+      console.log('App version changed:', lastVer, '→', APP_VERSION, 'clearing SW');
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) await r.unregister();
+        const keys = await caches.keys();
+        for (const k of keys) await caches.delete(k);
+      }
+      localStorage.setItem('app_version', APP_VERSION);
+      location.reload();
+      return;
+    }
+    localStorage.setItem('app_version', APP_VERSION);
     await storage.init();
     await this.ensureDefaultData();
     babyfoodModule.mergeCustomIngredients(); // 合并自定义辅食食材
@@ -2074,7 +2090,36 @@ const app = {
   async registerSW() {
     if ('serviceWorker' in navigator) {
       try {
-        await navigator.serviceWorker.register('./sw.js', {scope:'./'});
+        const reg = await navigator.serviceWorker.register('./sw.js', {scope:'./'});
+        // 监听新 SW 接管，自动刷新页面
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('SW controller changed, reloading...');
+          location.reload();
+        });
+        // 监听 SW 消息
+        navigator.serviceWorker.addEventListener('message', (e) => {
+          if (e.data && e.data.type === 'SW_UPDATED') {
+            console.log('SW updated to', e.data.version);
+            location.reload();
+          }
+        });
+        // 检查是否有等待中的新 SW
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // 新 SW 已安装，强制接管
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          }
+        });
+        // 每 30 秒检查一次 SW 更新
+        setInterval(() => reg.update(), 30000);
       } catch(e) { console.warn('SW registration failed', e); }
     }
   },
