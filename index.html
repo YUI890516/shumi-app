@@ -4570,7 +4570,7 @@ const goldModule = {
     const isUp = d.upDown >= 0;
     const color = isUp ? '#E53935' : '#43A047';
     const arrow = isUp ? '↑' : '↓';
-    return `<div class="aqi-card" style="background:rgba(229,57,53,0.06);">
+    return `<div class="aqi-card" data-gold-card style="background:rgba(229,57,53,0.06);">
       <div class="aqi-card-source">🪙 招行黄金买入价</div>
       <div class="aqi-card-value-row">
         <div class="aqi-card-value" style="color:var(--ios-primary);font-size:18px;">¥${d.buyPrice.toFixed(2)}</div>
@@ -4581,10 +4581,21 @@ const goldModule = {
   },
 
   renderBar(data) {
-    // 金价卡片现在渲染到 aqi-bar（由 aqiModule.render 统一渲染）
-    // 触发 aqiModule 重新渲染（如果 AQI 数据已有）
-    if (aqiModule._cache) {
-      aqiModule.render(aqiModule._cache);
+    // 直接更新 aqi-bar 中的金价卡片，不依赖 aqiModule
+    const bar = $('aqi-bar');
+    if (!bar) return;
+    // 查找现有的金价卡片（gold-card 标记）并替换
+    const existingGoldCard = bar.querySelector('[data-gold-card]');
+    const goldHtml = this.getGoldCardHtml();
+    if (existingGoldCard) {
+      if (goldHtml) {
+        existingGoldCard.outerHTML = goldHtml;
+      } else {
+        existingGoldCard.remove();
+      }
+    } else if (goldHtml) {
+      // 没有金价卡片但有金价数据，插入到月龄卡片之后
+      bar.insertAdjacentHTML('afterbegin', goldHtml);
     }
   },
 
