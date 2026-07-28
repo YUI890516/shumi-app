@@ -1311,6 +1311,7 @@ class MealGenerator {
       if (td.getTime() < cutoff) continue;
       if (t.content?.dishes) {
         for (const d of t.content.dishes) {
+          if (!d) continue;
           for (const ing of d.ingredients || []) {
             map[ing] = (map[ing] || 0) + 1;
           }
@@ -1364,6 +1365,7 @@ class MealGenerator {
   hasHighFiberSoFar(dishes, threshold = 1) {
     let count = 0;
     for (const d of dishes) {
+      if (!d) continue;
       if (d.fiber === 'high') count++;
     }
     return count >= threshold;
@@ -1531,6 +1533,7 @@ class MealGenerator {
     // 主食算 1 种食材（如"米饭+糙米"含米饭和糙米，但算 1 种主食）
     const set = new Set();
     for (const d of dishes) {
+      if (!d) continue; // 跳过 null 占位
       if (d.category === 'staple') {
         set.add(d.name); // 主食按菜名算 1 种
       } else {
@@ -2752,8 +2755,7 @@ const babyfoodModule = {
     // 每个栏位允许的食材类型
     const slotTypes = ['staple', 'green', 'all', 'all'];
 
-    // 把 dishes 分配到栏位
-    // dish 0 -> slot 0 (staple), dish 1 -> slot 1 (green), dish 2 -> slot 2, dish 3 -> slot 3
+    // 把 dishes 分配到栏位（dishes 数组按栏位索引存储，null 为空栏位）
     const slots = [null, null, null, null];
     for (let i = 0; i < Math.min(dishes.length, 4); i++) {
       slots[i] = dishes[i];
@@ -2761,9 +2763,11 @@ const babyfoodModule = {
 
     const colors = {staple:'#FF9500', protein:'#FF3B30', fish:'#5856D6', vegetable:'#34C759', bean:'#007AFF', dairy:'#5AC8FA', fruit:'#FFCC00', soup:'#AF52DE'};
 
+    // 概要行只显示有内容的菜品
+    const validDishes = dishes.filter(d => d && d.name);
     let body = `<div class="meal-header">
       <div><div class="meal-name">${icon} ${label}</div>
-      <div class="meal-type">${dishes.length ? dishes.map(d=>d.name).join(' · ') : '请选择食材'}</div></div>
+      <div class="meal-type">${validDishes.length ? validDishes.map(d=>d.name).join(' · ') : '请选择食材'}</div></div>
       <div style="font-size:12px;color:${ingCount > MAX_ING ? 'var(--ios-red)' : 'var(--ios-text-secondary)'};white-space:nowrap;">${ingCount}/${MAX_ING}种</div>
     </div>
     <div class="meal-dishes">`;
@@ -2823,9 +2827,9 @@ const babyfoodModule = {
         dish.name = prefix + dish.ingredients.join('');
       }
     } else {
-      task.content.dishes.splice(dishIndex, 1);
+      // 只剩1个食材，删除整道菜，用 null 占位保持栏位对齐
+      task.content.dishes[dishIndex] = null;
     }
-    task.content.dishes = task.content.dishes.filter(d => d !== null);
     task.content.manuallyEdited = true;
     task.content.nutritionSummary = this._calcNutrition(task.content.dishes);
     task.updatedAt = new Date().toISOString();
@@ -2834,12 +2838,13 @@ const babyfoodModule = {
   },
 
   _calcNutrition(dishes) {
+    const valid = dishes.filter(d => d);
     return {
-      protein: dishes.some(d => d.category === 'protein' || d.category === 'fish'),
-      vegetables: dishes.some(d => d.category === 'vegetable'),
-      staple: dishes.some(d => d.category === 'staple'),
-      fish: dishes.some(d => d.category === 'fish'),
-      beans: dishes.some(d => d.category === 'bean' || (d.ingredients || []).some(i => {
+      protein: valid.some(d => d.category === 'protein' || d.category === 'fish'),
+      vegetables: valid.some(d => d.category === 'vegetable'),
+      staple: valid.some(d => d.category === 'staple'),
+      fish: valid.some(d => d.category === 'fish'),
+      beans: valid.some(d => d.category === 'bean' || (d.ingredients || []).some(i => {
         const all = [...FOOD_DATA.beans, ...FOOD_DATA.legumes];
         return all.some(x => x.name === i);
       }))
@@ -2861,6 +2866,7 @@ const babyfoodModule = {
     for (const t of allTasks) {
       if (t.module !== 'babyfood') continue;
       for (const d of (t.content?.dishes || [])) {
+        if (!d) continue;
         for (const ing of (d.ingredients || [d.name])) {
           if (!lastUsedMap[ing] || t.date > lastUsedMap[ing]) lastUsedMap[ing] = t.date;
         }
@@ -2870,8 +2876,8 @@ const babyfoodModule = {
     // 当前餐已用食材 + 跨餐去重（非肉类）
     const meatNames = FOOD_DATA.proteins.map(p => p.name);
     const otherMealTask = allTasks.find(t => t.date === task.date && t.module === 'babyfood' && t.type !== mealType);
-    const otherMealIng = (otherMealTask?.content?.dishes || []).flatMap(d => d.ingredients || [d.name]).filter(ing => !meatNames.includes(ing));
-    const usedNames = (task.content?.dishes || []).flatMap(d => d.ingredients || [d.name]).concat(otherMealIng);
+    const otherMealIng = (otherMealTask?.content?.dishes || []).filter(d => d).flatMap(d => d.ingredients || [d.name]).filter(ing => !meatNames.includes(ing));
+    const usedNames = (task.content?.dishes || []).filter(d => d).flatMap(d => d.ingredients || [d.name]).concat(otherMealIng);
 
     const ingCount = mealGenerator.countIngredients(task.content?.dishes || []);
 
@@ -2881,26 +2887,23 @@ const babyfoodModule = {
       // 主食
       items = FOOD_DATA.staples.map(s => ({...s, cat: 'staple', icon: '🍚'}));
     } else if (slot === 1) {
-      // 第二栏：先选绿叶菜，再可选所有食材
-      // 如果还没有绿叶菜，只显示绿叶菜
-      const hasGreen = (task.content?.dishes || []).some(d => d.category === 'vegetable' && (d.ingredients || []).some(i => FOOD_DATA.greens.some(g => g.name === i)));
+      // 第二栏：先选绿叶菜，再可选所有食材（不含主食）
+      const hasGreen = (task.content?.dishes || []).some(d => d && d.category === 'vegetable' && (d.ingredients || []).some(i => FOOD_DATA.greens.some(g => g.name === i)));
       if (!hasGreen) {
         items = FOOD_DATA.greens.map(g => ({...g, cat: 'vegetable', icon: '🥬'}));
       } else {
-        // 已有绿叶菜，显示所有食材
+        // 已有绿叶菜，显示所有食材（不含主食和绿叶菜——绿叶菜只在第二栏首次选择）
         items = [
           ...FOOD_DATA.proteins.map(p => ({...p, cat: p.category === 'fish' ? 'fish' : 'protein', icon: '🍖'})),
-          ...FOOD_DATA.greens.map(g => ({...g, cat: 'vegetable', icon: '🥬'})),
           ...FOOD_DATA.sides.map(s => ({...s, cat: 'vegetable', icon: s.sub === 'mushroom' || s.sub === 'fungus' ? '🍄' : '🥕'})),
           ...FOOD_DATA.beans.map(b => ({...b, cat: 'bean', icon: '🫘'})),
           ...FOOD_DATA.legumes.map(l => ({...l, cat: 'bean', icon: '🌱'}))
         ];
       }
     } else {
-      // 第三、四栏：所有食材
+      // 第三、四栏：所有食材（不含主食和绿叶菜——绿叶菜只在第二栏）
       items = [
         ...FOOD_DATA.proteins.map(p => ({...p, cat: p.category === 'fish' ? 'fish' : 'protein', icon: '🍖'})),
-        ...FOOD_DATA.greens.map(g => ({...g, cat: 'vegetable', icon: '🥬'})),
         ...FOOD_DATA.sides.map(s => ({...s, cat: 'vegetable', icon: s.sub === 'mushroom' || s.sub === 'fungus' ? '🍄' : '🥕'})),
         ...FOOD_DATA.beans.map(b => ({...b, cat: 'bean', icon: '🫘'})),
         ...FOOD_DATA.legumes.map(l => ({...l, cat: 'bean', icon: '🌱'}))
@@ -2945,7 +2948,7 @@ const babyfoodModule = {
     };
 
     const slotNames = ['主食', '绿叶菜', '第三栏', '第四栏'];
-    const hint = slot === 1 && !(task.content?.dishes || []).some(d => d.category === 'vegetable' && (d.ingredients || []).some(i => FOOD_DATA.greens.some(g => g.name === i)))
+    const hint = slot === 1 && !(task.content?.dishes || []).some(d => d && d.category === 'vegetable' && (d.ingredients || []).some(i => FOOD_DATA.greens.some(g => g.name === i)))
       ? '请先选择绿叶菜' : '点击添加食材（久未吃的靠前）';
 
     let body = `
@@ -3005,20 +3008,16 @@ const babyfoodModule = {
     }
 
     if (slot === 0) {
-      // 主食：替换或新建
-      const stapleIdx = dishes.findIndex(d => d.category === 'staple');
+      // 主食：替换或新建（slot 0 固定为主食位）
       const stapleData = FOOD_DATA.staples.find(s => s.name === ingredientName || (s.ingredients || []).includes(ingredientName));
       const stapleName = stapleData ? mealGenerator.getStapleName(stapleData) : ingredientName;
       const stapleIng = stapleData ? (stapleData.ingredients || [stapleData.name]) : [ingredientName];
-      if (stapleIdx >= 0) {
-        dishes[stapleIdx] = { name: stapleName, category: 'staple', ingredients: stapleIng, note: '' };
-      } else {
-        dishes.unshift({ name: stapleName, category: 'staple', ingredients: stapleIng, note: '' });
-      }
+      dishes[0] = { name: stapleName, category: 'staple', ingredients: stapleIng, note: '' };
     } else {
-      // slot 1/2/3 对应 dishes[slot]
+      // slot 1/2/3 对应 dishes[slot]，dishes 数组用 null 保持栏位对齐
       // 检查相克
       for (const d of dishes) {
+        if (!d) continue;
         const incompatible = FOOD_DATA.incompatible[ingredientName] || [];
         if ((d.ingredients || []).some(i => incompatible.includes(i))) {
           if (!confirm(`${ingredientName}与${d.name}中的食材不宜同食，仍要添加吗？`)) return;
@@ -3040,22 +3039,16 @@ const babyfoodModule = {
           }
         }
       } else {
-        // 当前栏位没有菜品：新建菜品放到 slot 位置
+        // 当前栏位没有菜品：新建菜品放到 slot 位置（用 null 占位保持对齐）
         const cookMethods = ['清蒸', '水煮', '凉拌'];
         const m = cookMethods[Math.floor(Math.random() * cookMethods.length)];
         const dishName = cat === 'bean' ? ingredientName + '炖汤' : m + ingredientName;
-        const newDish = { name: dishName, category: cat, ingredients: [ingredientName], note: '手动选择' };
-        // 确保 dishes 数组长度足够
         while (dishes.length < slot) dishes.push(null);
-        dishes[slot] = newDish;
-        // 清除 null 占位
-        for (let i = dishes.length - 1; i >= 0; i--) {
-          if (dishes[i] === null) dishes.splice(i, 1);
-        }
+        dishes[slot] = { name: dishName, category: cat, ingredients: [ingredientName], note: '手动选择' };
       }
     }
 
-    task.content.dishes = dishes.filter(d => d !== null);
+    task.content.dishes = dishes;
     task.content.manuallyEdited = true;
     task.content.nutritionSummary = this._calcNutrition(task.content.dishes);
     task.updatedAt = new Date().toISOString();
@@ -3099,6 +3092,7 @@ const babyfoodModule = {
     for (const t of allTasks) {
       const dishes = t.content?.dishes || (t.content?.lunch?.dishes ? [...t.content.lunch.dishes, ...t.content.dinner.dishes] : []);
       for (const d of dishes) {
+        if (!d) continue;
         for (const ing of (d.ingredients || [d.name])) {
           if (!lastUsedMap[ing] || t.date > lastUsedMap[ing]) lastUsedMap[ing] = t.date;
         }
