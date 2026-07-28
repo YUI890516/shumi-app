@@ -4527,20 +4527,21 @@ const goldModule = {
     }
 
     try {
-      // 优先用本地代理，失败则用 CORS 代理直连
-      let res;
-      try {
-        res = await fetch('/api/gold');
-      } catch(e) {
-        res = null;
+      // 尝试多个数据源：本地代理 → cors.sh → allorigins
+      const targetUrl = 'https://m.cmbchina.com/api/rate/gold';
+      const proxies = [
+        '/api/gold',
+        'https://proxy.cors.sh/' + targetUrl,
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(targetUrl)
+      ];
+      let res = null;
+      for (const url of proxies) {
+        try {
+          res = await fetch(url);
+          if (res && res.ok) break;
+        } catch(e) { res = null; }
       }
-      if (!res || !res.ok) {
-        // CORS 代理 fallback
-        const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://m.cmbchina.com/api/rate/gold');
-        res = await fetch(proxyUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-      }
+      if (!res || !res.ok) throw new Error('所有代理均不可用');
       const json = await res.json();
       if (json.returnCode === 'SUC0000' && json.body && json.body.data) {
         // 找 Au99.99（招行积存金参考价）
