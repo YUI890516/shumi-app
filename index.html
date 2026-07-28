@@ -743,9 +743,7 @@ const FOOD_DATA = {
     {name:"面条", sub:"noodle", fiber:'low', flavor:'mild', season:[], common:true, ingredients:["面条"]},
     {name:"小米", sub:"millet", fiber:'low', flavor:'mild', season:[], common:true, ingredients:["小米"]},
     {name:"面疙瘩", sub:"dough_drop", fiber:'low', flavor:'mild', season:[], ingredients:["面疙瘩"]},
-    {name:"意大利面", sub:"pasta", fiber:'low', flavor:'mild', season:[], ingredients:["意大利面"]},
-    {name:"蒸糕", sub:"steamed_cake", fiber:'low', flavor:'sweet', season:[], ingredients:["蒸糕"]},
-    {name:"吐司", sub:"toast", fiber:'low', flavor:'mild', season:[], ingredients:["吐司"]}
+    {name:"意大利面", sub:"pasta", fiber:'low', flavor:'mild', season:[], ingredients:["意大利面"]}
   ],
   // 蛋白质类：肉类 + 鱼类 + 蛋（2-3岁宝宝）
   // meatType: 'red' 红肉（猪/牛/羊/鸭/鹅肝/蛋），'white' 白肉（鸡/鱼/虾）
@@ -764,9 +762,7 @@ const FOOD_DATA = {
     {name:"虾仁", sub:"shrimp", meatType:'white', freq:"fish_weekly", season:[], flavor:'mild', common:true, category:'fish'},
     {name:"三文鱼", sub:"fatty_fish", meatType:'white', freq:"fish_weekly", season:[], flavor:'mild', common:true, category:'fish'},
     {name:"龙利鱼", sub:"white_fish", meatType:'white', freq:"fish_weekly", season:[], flavor:'mild', common:true, category:'fish'},
-    {name:"鳕鱼", sub:"white_fish", meatType:'white', freq:"fish_weekly", season:[11,3], flavor:'mild', common:true, category:'fish'},
-    {name:"巴沙鱼", sub:"white_fish", meatType:'white', freq:"fish_weekly", season:[], flavor:'mild', category:'fish'},
-    {name:"鲈鱼", sub:"white_fish", meatType:'white', freq:"fish_weekly", season:[9,11], flavor:'mild', category:'fish'}
+    {name:"鳕鱼", sub:"white_fish", meatType:'white', freq:"fish_weekly", season:[11,3], flavor:'mild', common:true, category:'fish'}
   ],
   // 绿叶菜：第二行，每餐只一种，应季优先
   greens: [
@@ -835,8 +831,7 @@ const FOOD_DATA = {
     {name:"黑豆", sub:"black_bean", fiber:'high', season:[], flavor:'mild', legume:true},
     {name:"黄豆", sub:"soybean", fiber:'high', season:[], flavor:'mild', legume:true},
     {name:"鹰嘴豆", sub:"chickpea", fiber:'high', season:[], flavor:'mild', legume:true},
-    {name:"红豆", sub:"red_bean", fiber:'high', season:[], flavor:'sweet', legume:true},
-    {name:"绿豆", sub:"mung_bean", fiber:'high', season:[5,9], flavor:'mild', legume:true}
+    {name:"毛豆", sub:"mung_bean", fiber:'high', season:[7,9], flavor:'mild', legume:true}
   ],
   // 食材相克表：不能同餐出现的组合
   incompatible: {
@@ -1507,18 +1502,20 @@ class MealGenerator {
 
   // 选择豆制品或豆类
   pickBeanOrLegume(rng, month, usageMap, usedIngredients, maxFiber = 'high') {
-    // 优先豆制品（烹饪方便）
-    let pool = FOOD_DATA.beans.filter(b => !usedIngredients.includes(b.name));
-    if (maxFiber === 'low') pool = pool.filter(b => b.fiber === 'low');
-    if (maxFiber === 'mid') pool = pool.filter(b => b.fiber !== 'high');
-    pool = this.filterCompatible(pool, usedIngredients);
-    if (pool.length) return this.pickByUsage(pool, usageMap, rng);
-    // 备选全豆
-    pool = FOOD_DATA.legumes.filter(l => !usedIngredients.includes(l.name));
-    if (maxFiber === 'low') pool = pool.filter(l => l.fiber === 'low');
-    if (maxFiber === 'mid') pool = pool.filter(l => l.fiber !== 'high');
-    pool = this.filterCompatible(pool, usedIngredients);
-    return this.pickByUsage(pool, usageMap, rng);
+    // 豆腐和全豆轮流出现，用 rng 随机决定优先选哪种
+    const tryBeans = rng.bool(0.5);
+    const groups = tryBeans 
+      ? [FOOD_DATA.beans, FOOD_DATA.legumes]
+      : [FOOD_DATA.legumes, FOOD_DATA.beans];
+    
+    for (const group of groups) {
+      let pool = group.filter(b => !usedIngredients.includes(b.name));
+      if (maxFiber === 'low') pool = pool.filter(b => b.fiber === 'low');
+      if (maxFiber === 'mid') pool = pool.filter(b => b.fiber !== 'high');
+      pool = this.filterCompatible(pool, usedIngredients);
+      if (pool.length) return this.pickByUsage(pool, usageMap, rng);
+    }
+    return null;
   }
 
   // 检查是否满足"天然甜味且宝宝喜欢"
@@ -1584,7 +1581,7 @@ class MealGenerator {
 
   // 天然甜味配菜（单独成菜或搭配）
   sweetSides() {
-    return ['胡萝卜','番茄','南瓜','玉米','红薯','彩椒','洋葱','豌豆','毛豆','蒸糕'];
+    return ['胡萝卜','番茄','南瓜','玉米','红薯','彩椒','洋葱','豌豆','毛豆'];
   }
 
   // 调味类配菜（不单独成菜，只作为辅料）
@@ -1800,18 +1797,26 @@ class MealGenerator {
         const method = this.getCookMethod(rng);
         const isBean = FOOD_DATA.beans.some(b => b.name === bean.name);
         const beanExclude = [...starchyExclude, ...pumpkinCarrotExclude()];
-        const beanPartner = isBean ? this.pickBeanPartner(rng, month, usageMap, usedAll().concat(beanExclude), mealMaxFiber) : null;
-        // 豆制品必须有搭配食材，不单独成菜（如不搭配其他食材则跳过豆制品）
-        if (isBean && !beanPartner) {
+        // 豆制品和全豆都必须有搭配食材，不单独成菜
+        let beanPartner = this.pickBeanPartner(rng, month, usageMap, usedAll().concat(beanExclude), mealMaxFiber);
+        // 放宽限制重试
+        if (!beanPartner) {
+          beanPartner = this.pickBeanPartner(rng, month, usageMap, usedAll().concat(beanExclude), 'high');
+        }
+        if (!beanPartner) {
+          beanPartner = this.pickBeanPartner(rng, month, usageMap, usedAll(), 'high');
+        }
+        // 没有搭配食材则跳过
+        if (!beanPartner) {
           bean = null;
-        } else if (bean) {
-          const partnerName = beanPartner ? beanPartner.name : '';
-          const dishName = partnerName ? `${partnerName}${bean.name}炖汤` : this.makeDishName(bean, method, 'bean');
+        } else {
+          const partnerName = beanPartner.name;
+          const dishName = `${partnerName}${bean.name}炖汤`;
           dishes.push({
             name: dishName,
             category: 'bean',
-            ingredients: [bean.name, ...(partnerName ? [partnerName] : [])],
-            note: `${method.note}，豆腐搭配食材更营养`,
+            ingredients: [bean.name, partnerName],
+            note: `${method.note}，搭配食材更营养`,
             fiber: bean.fiber,
             legume: true
           });
