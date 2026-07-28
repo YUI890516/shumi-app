@@ -1862,10 +1862,11 @@ class MealGenerator {
       }
     }
 
-    // 7. 控制食材在 5 种（主食算1种）。移除顺序：单独配菜 > 绿叶菜蘑菇搭配 > 豆制品搭配配菜
+    // 7. 控制食材在 5 种（主食算1种）。移除顺序：单独配菜 > 绿叶菜蘑菇搭配 > 移除豆制品整���菜
     // 注意：山药（豆类杂粮主食必须搭配）不可被移除
+    // 蛋白质和豆制品的搭配配菜不剥离（必须搭配其他食材）
     while (this.countIngredients(dishes) > 5) {
-      let action = -1; // 0=移除单独配菜, 1=剥离绿叶菜蘑菇, 2=剥离豆制品搭配
+      let action = -1; // 0=移除单独配菜, 1=剥离绿叶菜蘑菇, 2=移除豆制品整道菜
       let targetIdx = -1;
 
       // 优先移除 step 5/6 添加的单独配菜（跳过山药）
@@ -1888,27 +1889,40 @@ class MealGenerator {
         }
       }
 
-      // 豆制品和全豆的搭配配菜不剥离（和蛋白质一样受保护）
+      // 最后移除豆制品整道菜（豆制品和搭配配菜不可分离，只能整道移除）
+      if (action < 0) {
+        for (let i = dishes.length - 1; i >= 0; i--) {
+          if (dishes[i].category === 'bean') {
+            action = 2; targetIdx = i; break;
+          }
+        }
+      }
+
       if (action < 0) break;
 
       if (action === 0) {
-        // 移除整道单独配菜
         const removed = dishes.splice(targetIdx, 1)[0];
         const idx = mealItems.findIndex(m => m.name === removed.ingredients[0]);
         if (idx >= 0) mealItems.splice(idx, 1);
       } else if (action === 1) {
-        // 剥离绿叶菜的蘑菇搭配，只保留绿叶菜本身
         const dish = dishes[targetIdx];
         const mushroomTypes = ['香菇','白蘑菇','蘑菇','平菇','蟹味菇','牛肝菌','鸡纵菌'];
         const removedIng = dish.ingredients.filter(ing => mushroomTypes.includes(ing));
         dish.ingredients = dish.ingredients.filter(ing => !mushroomTypes.includes(ing));
-        // 重建菜名
         const m = this.getCookMethod(rng);
         dish.name = `${m.prefix}${dish.ingredients[0]}`;
         for (const ing of removedIng) {
           const idx = mealItems.findIndex(m => m.name === ing);
           if (idx >= 0) mealItems.splice(idx, 1);
         }
+      } else if (action === 2) {
+        // 移除整道豆制品菜
+        const removed = dishes.splice(targetIdx, 1)[0];
+        for (const ing of (removed.ingredients || [])) {
+          const idx = mealItems.findIndex(m => m.name === ing);
+          if (idx >= 0) mealItems.splice(idx, 1);
+        }
+        hasBean = false;
       }
     }
 
